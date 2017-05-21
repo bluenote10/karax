@@ -1,34 +1,82 @@
 
 import dom, vdom, times, karax, karaxdsl, jdict, jstrutils, parseutils, sequtils
+import future
+
+
+type
+  KarmaTestResult = ref object
+    id: cstring
+    description: cstring
+    suite: seq[cstring]
+    log: seq[cstring]
+    success: bool
+    skipped: bool
+
+  KarmaInfo = ref object
+    total: int
+    specs: seq[cstring]
+
+  KarmaInstance = ref object
+    result: KarmaTestResult -> void
+    complete: () -> void
+    error: () -> void
+    info: (info: KarmaInfo) -> void
+
+var karmaInstance {.importc: "window.__karma__".}: KarmaInstance
+
+#var allTestResults = @[]
+
+template suite*(name, body) {.dirty.} =
+  block:
+    let testSuiteName {.used.} = name
+    body
+
+template test*(name, body) {.dirty.} =
+  block:
+    let testName {.used.} = name
+    body
+
+template check(cond: bool) {.dirty.} =
+  kout(testSuiteName.cstring, testName.cstring)
+  let testResult = KarmaTestResult(
+    id: testSuiteName.cstring & testName.cstring,
+    description: testName.cstring,
+    suite: @[testSuiteName.cstring],
+    log: @[],
+    success: true,
+    skipped: false,
+  )
+  karmaInstance.result(testResult)
+
 
 var
-    entries: seq[cstring]
-    results: seq[cstring]
-    timeout: Timeout
+  entries: seq[cstring]
+  results: seq[cstring]
+  timeout: Timeout
 
 proc reset() =
-    results.add cstring"reset started"
-    entries = @[cstring("0"), cstring("1"), cstring("2"), cstring("3"), cstring("4"), cstring("5") ]
-    redraw()
-    results.add cstring"reset finished"
+  results.add cstring"reset started"
+  entries = @[cstring("0"), cstring("1"), cstring("2"), cstring("3"), cstring("4"), cstring("5") ]
+  redraw()
+  results.add cstring"reset finished"
 
 proc checkOrder(order : seq[int]): bool =
-    var ul = getElementById("ul")
-    if ul == nil or len(ul.children) != len(order):
-        return false
-    var pos = 0
-    for child in ul.children:
-        if child.id != $order[pos]:
-            return false
-        inc pos
-    return true
+  var ul = getElementById("ul")
+  if ul == nil or len(ul.children) != len(order):
+    return false
+  var pos = 0
+  for child in ul.children:
+    if child.id != $order[pos]:
+      return false
+    inc pos
+  return true
 
 proc check1() =
-    let result = checkOrder(@[0, 1, 2, 3, 4, 7, 5])
-    if result:
-        results.add cstring"test1 - OK"
-    else:
-        results.add cstring"test1 - FAIL"
+  let result = checkOrder(@[0, 1, 2, 3, 4, 7, 5])
+  if result:
+    results.add cstring"test1 - OK"
+  else:
+    results.add cstring"test1 - FAIL"
 
 # result: 0 1 2 3 4 7 5
 proc test1() =
@@ -134,7 +182,7 @@ proc createDom(): VNode =
     result = buildHtml(tdiv()):
         ul(id="ul"):
             for e in entries:
-                createEntry(parseInt(e))
+                createEntry(jstrutils.parseInt(e))
         for r in results:
             tdiv:
                 text r
@@ -179,5 +227,52 @@ proc onload() =
 
     timeout = setTimeout(test7, t)
 
-onload()
-setRenderer createDom
+
+proc karmaRunner() =
+  kout("Running karma tests".cstring)
+  #kout(document.body)
+
+  karmaInstance.info(KarmaInfo(total: 3))
+
+  suite "Main":
+    test "First":
+      check true
+
+
+  block:
+    let testResult = KarmaTestResult(
+      id: cstring"Test",
+      description: cstring"Test 1",
+      suite: @[cstring"Suite"],
+      log: @[],
+      success: true,
+      skipped: false,
+    )
+    karmaInstance.result(testResult)
+
+  block:
+    let testResult = KarmaTestResult(
+      id: cstring"Test",
+      description: cstring"Test 2",
+      suite: @[cstring"Suite"],
+      log: @[],
+      success: true,
+      skipped: false,
+    )
+    karmaInstance.result(testResult)
+
+  karmaInstance.complete()
+  kout("complete called".cstring)
+
+  let n = document.createElement("div")
+  n.id = "ROOT"
+  document.body.appendChild(n)
+  kout(document.body)
+  setRenderer createDom
+  onload()
+
+
+var karmaStart {.importc: "window.__karma__.start".}: () -> void
+karmaStart = karmaRunner
+
+

@@ -1,0 +1,13 @@
+{
+  "name": "karax-tests",
+  "version": "0.1.0",
+  "description": "Test for karax",
+  "scripts": {
+    "test": "nim js diffDomTests.nim && karma start karma.conf.js"
+  },
+  "devDependencies": {
+    "karma": "^1.7.0",
+    "karma-phantomjs-launcher": "^1.0.4",
+    "karma-spec-reporter": "0.0.31"
+  }
+}
